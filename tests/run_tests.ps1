@@ -92,7 +92,7 @@ Check "--all+excl: radio-b not selected" (-not ($r.Out -match 'radio-b'))
 $r = RunExe @('--config', $testIni, '--offline', '--dry-run', '--tags', 'net')
 Check "offline net: nothing executed/simulated" (-not ($r.Out -match 'ping -n 1'))
 
-# 9. gui-tagged item: --dry-run simulates it (spec §5.1); only --silent skips it (spec §5.2 #4)
+# 9. gui-tagged item: --dry-run simulates it; --silent skips it.
 $r = RunExe @('--config', $testIni, '--dry-run', '--tags', 'gui')
 Check "gui item simulated in dry-run (not skipped)" ($r.Out -match 'start notepad\.exe')
 Check "gui item not rejected in dry-run" (-not ($r.Out -match 'SKIPPED \(Interactive GUI required\)'))

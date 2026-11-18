@@ -53,7 +53,7 @@ bool ParseCommandLine(const std::wstring& cmdLine, Options& out, std::string& ou
 // True when the invocation only needs non-GUI console output.
 bool IsConsoleInvocation(const Options& opts);
 
-// Selection & filter pipeline (spec 5.2): base -> exclusions -> guards -> groups.
+// Selection & filter pipeline: base -> exclusions -> guards -> groups.
 // Mutates items[].checked in place. 'gui' items are NOT removed here.
 void ApplySelectionFilters(std::vector<TaskItem>& items, const Options& opts, bool isOnline);
 

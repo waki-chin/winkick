@@ -40,8 +40,10 @@ $info = [ordered]@{
 }
 [IO.File]::WriteAllText((Join-Path $dist 'build-info.json'), ($info | ConvertTo-Json -Depth 6) + "`n", (New-Object Text.UTF8Encoding($false)))
 foreach ($name in @('winkick.exe','tasks.ini','build-info.json')) { Copy-Item (Join-Path $dist $name) $stage }
-foreach ($name in @('README.md','LICENSE','SECURITY.md','CHANGELOG.md','CONTRIBUTING.md')) { Copy-Item (Join-Path $script:RepoRoot $name) $stage }
-Copy-Item (Join-Path $script:RepoRoot 'docs') $stage -Recurse
+foreach ($name in @('README.md','LICENSE','SECURITY.md','CHANGELOG.md')) { Copy-Item (Join-Path $script:RepoRoot $name) $stage }
+$stageDocs = Join-Path $stage 'docs'
+[void][IO.Directory]::CreateDirectory($stageDocs)
+Copy-Item (Join-Path $script:RepoRoot 'docs\tasks.md') $stageDocs
 $zip = Join-Path $dist "winkick-v$version-windows-x64.zip"
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
 $lines = @(Get-ChildItem $dist -File | Sort-Object Name | ForEach-Object {

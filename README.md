@@ -17,7 +17,7 @@ then apply them through a Win32 GUI or command line.
 ## Download and verify
 
 Use the [Releases page](https://github.com/waki-chin/winkick/releases) for
-official downloads when available. Release assets are built from the version
+official downloads. Release assets are built from the version
 tag by GitHub Actions, not uploaded from a maintainer's PC:
 
 - `winkick.exe` — standalone x64 executable.
@@ -77,9 +77,10 @@ tasks explicitly normalize completed-install code 3010 and show a restart notice
 
 ## Catalog
 
-The catalog offers package-manager setup, the selected application installs,
-and a smaller set of Windows preferences. See [task documentation](docs/tasks.md)
-and inspect the actual [catalog](res/tasks.ini).
+The catalog offers package-manager setup, application installs, and Windows
+preferences. See the [task reference](docs/tasks.md) and the
+[catalog source](https://github.com/waki-chin/winkick/blob/main/res/tasks.ini).
+Each release also includes its own `tasks.ini`.
 
 - WSL is two-stage: enable prerequisites, restart manually if required, then
   install WSL. No Linux distribution is installed automatically.
@@ -101,12 +102,10 @@ by the build.
 
 ```powershell
 .\build.bat
-.\scripts\test-build.ps1
-.\scripts\check-reproducible.ps1
 .\build\winkick.exe
 
-# Optional local package, after tests; dist/ must not already exist.
-.\scripts\package.ps1
+# Optional: run the local test suite.
+.\scripts\test-build.ps1
 ```
 
 `VERSION` is the only product-version source. Build-generated headers, resources,
@@ -114,11 +113,7 @@ objects, analysis outputs, and the EXE belong in `build/`; test evidence is in
 `tests/out/`. The EXE embeds `res/tasks.ini`; rebuilding is necessary after catalog
 changes unless loading that file explicitly with `--config`.
 
-Run the full safe test suite locally before tagging a release; the repeat
-build is optional. GitHub builds on version tags only and checks the EXE,
-including its `--version` output and exact embedded catalog, before packaging.
-Neither the local automated tests nor GitHub install the catalog's apps or
-perform real reboot/Explorer restart actions.
+The automated tests don't install apps, reboot Windows, or restart Explorer.
 
 ## Repository layout
 
@@ -128,20 +123,12 @@ res/                 Catalog, icon, manifest, resource IDs
 tests/               Harmless fixtures and test sources (no committed binaries)
 scripts/             Build verification, versioning, packaging, release checks
 .github/             Release workflow, dependency updates, issue templates
-docs/                Task format, GitHub setup, release process, design input
+docs/                Task catalog reference
 VERSION              Product version
 build.bat            Local x64 /MT build -> build/winkick.exe
 ```
 
-Build outputs, release bundles, logs, local exports, credentials/certificates,
-and machine-specific historical reports do **not** belong in Git. Existing
-historical materials on the development machine are preserved under ignored
-`.local/`, not shipped or included in source history.
-
-See [contributing](CONTRIBUTING.md), [security](SECURITY.md),
-[GitHub setup](docs/github-setup.md), and [release procedure](docs/releasing.md).
-Local preparation results and untested integrations are in
-[validation.md](docs/validation.md).
+See the [security policy](SECURITY.md) for vulnerability reporting.
 
 ## License
 

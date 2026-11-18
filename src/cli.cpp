@@ -234,7 +234,7 @@ bool ParseCommandLine(const std::wstring& cmdLine, Options& out, std::string& ou
 }
 
 // ============================================================================
-// Selection & filter pipeline (spec section 5.2)
+// Selection & filter pipeline
 // ============================================================================
 namespace {
 

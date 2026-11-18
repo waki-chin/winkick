@@ -155,7 +155,7 @@ Config ParseIniBlocks(const std::string& content, const std::string& sourceLabel
             size_t colon = value.find(':');
             std::string typePart, valPart;
             if (colon == std::string::npos) { typePart = "txt"; valPart = value; }
-            // Spec §2.2: split on the FIRST ':' only; the default is preserved verbatim (a user
+            // Split on the first ':' only; the default is preserved verbatim (a user
             // typing a leading space in an arg edit box round-trips through export/elevation)
             else { typePart = env::ToLower(env::Trim(value.substr(0, colon))); valPart = value.substr(colon + 1); }
             TaskArg arg;

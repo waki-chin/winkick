@@ -4,7 +4,7 @@
 #   A) VK_RETURN with focus on the Cancel button cancels the dialog (does NOT fetch).
 #   B) VK_RETURN with initial focus in the edit box accepts (empty URL -> fetch error box proves IDOK path ran).
 #   C) Main window: focus starts on the ListView; 30x Shift+Tab and 15x Tab stay responsive
-#      (pre-round-16 code spun forever here); dry-run Apply with Shift+Tab spam completes;
+#      and dry-run Apply completes even with repeated Shift+Tab input;
 #      focus is restored to the Apply button afterwards.
 #   D) Input dialog focus starts in the edit box (counted in the checks below).
 # Uses cross-process messages (BM_CLICK, SendInput for real key events), GetGUIThreadInfo-adjacent
@@ -201,7 +201,7 @@ function Check($label, $cond) {
     if ($cond) { $script:pass++; Write-Host "PASS: $label" -ForegroundColor Green } else { Write-Host "FAIL: $label" -ForegroundColor Red; $script:fail++ }
 }
 
-# ---------- Case A: Enter activates the FOCUSED control (round-16 regression oracle) ----------
+# ---------- Case A: Enter activates the focused control ----------
 # Real keys (SendInput) on a genuinely foreground dialog; focus measured via input-queue attach.
 $s = Start-WingetKick
 $dlg = Open-UrlDialog $s

@@ -481,7 +481,7 @@ Stats RunAll(std::vector<TaskItem>& items, const Options& opts,
             if (stateSink) stateSink(i, ItemRunState::Skipped, 0, 0);
         };
 
-        // Guards first (spec §3.1: guard-blocked items log their guard reason) — also keeps the
+        // Check guards first so blocked items log their reason — this also keeps the
         // reason accurate across the UAC elevation hand-off (serialized items arrive check:0).
         if (NetGuardBlocked(item, opts.isOnline)) { skip("Offline"); continue; }
         if (OsGuardMismatch(item)) { skip("OS mismatch"); continue; }

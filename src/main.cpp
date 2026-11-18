@@ -241,7 +241,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ PWSTR, _I
 
         runner::Options ropt;
         ropt.dryRun = opts.dryRun;
-        // Headless semantics per spec §5.1/§5.2: 'gui' items are skipped ONLY under --silent.
+        // In headless mode, 'gui' items are skipped only under --silent.
         // --dry-run without --silent simulates them (CMD/DRY-RUN lines, exact substituted commands).
         ropt.silent = opts.silent;
         ropt.guiMode = false;
@@ -259,7 +259,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ PWSTR, _I
         runner::Stats stats = runner::RunAll(cfg.items, ropt, sink, nullptr);
 
         if (!opts.dryRun && stats.anyReboot && !opts.noReboot) {
-            // Append the reboot status to the log file as well (spec: "print/log").
+            // Append the reboot status to the log file as well.
             // Only if RunAll actually opened the log — never create an orphaned one-line file.
             auto appendLog = [&opts, &stats](const std::string& line) {
                 if (!opts.logEnabled || !stats.logFileOpened) return;

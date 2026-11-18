@@ -1,7 +1,9 @@
 # Task catalog
 
-The authoritative catalog is [`res/tasks.ini`](../res/tasks.ini). There is no
-implicit preset: all shipped `check` values are zero.
+The source catalog is
+[`res/tasks.ini`](https://github.com/waki-chin/winkick/blob/main/res/tasks.ini).
+Each release includes a copy as `tasks.ini`. There is no implicit preset:
+all shipped `check` values are zero.
 
 ```ini
 [Explorer | Show file extensions]
