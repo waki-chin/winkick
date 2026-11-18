@@ -1,0 +1,37 @@
+// WinKick resource script
+#include <winres.h>
+#include "resource_ids.h"
+#include "version.h"
+
+1 RT_MANIFEST "app.manifest"
+
+IDR_DEFAULT_TASKS RCDATA "tasks.ini"
+IDI_APP_ICON      ICON   "app.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION WINKICK_FILE_VERSION
+ PRODUCTVERSION WINKICK_FILE_VERSION
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "WinKick Project"
+            VALUE "FileDescription", "WinKick - Modular Windows Setup & Task Utility"
+            VALUE "FileVersion", WINKICK_FILE_VERSION_STRING
+            VALUE "ProductName", "WinKick"
+            VALUE "ProductVersion", WINKICK_VERSION_STRING
+            VALUE "LegalCopyright", "Copyright (c) 2026 waki-chin. MIT License."
+            VALUE "OriginalFilename", "winkick.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible WinKick problem (not a private security disclosure).
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities use Security -> Report a vulnerability. Redact usernames, paths, tokens and private commands from diagnostics."
+  - type: input
+    id: version
+    attributes:
+      label: Version and download/build source
+      placeholder: "WinKick version, release tag or source commit"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows edition, build and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected/actual behavior
+      description: Include GUI/CLI mode, elevation status and a minimal harmless config if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted logs or screenshots
+      description: Do not attach unreviewed full-machine logs or credentials.

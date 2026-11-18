@@ -1,0 +1,14 @@
+name: Feature or task request
+description: Propose a focused feature or catalog task.
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: Problem and proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility, scope and trade-offs
+      description: For tasks, include Windows edition/build, user/machine scope, trusted documentation and restart/rollback implications.

@@ -1,0 +1,116 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build and verify Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 20
+    outputs:
+      artifact-id: ${{ steps.assets.outputs.artifact-id }}
+    defaults:
+      run:
+        shell: powershell
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check out exact event commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag and main ancestry
+        run: .\scripts\verify-release-tag.ps1 -Tag $env:RELEASE_TAG
+      - name: Build from source
+        shell: cmd
+        run: call build.bat
+      - name: Verify the executable and package release assets
+        run: .\scripts\package.ps1 -ReleaseTag $env:RELEASE_TAG
+      - name: Upload immutable build assets
+        id: assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-windows-x64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    name: Attest and publish
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: powershell
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # No checkout and no execution of the EXE or build-job scripts in this job.
+      - name: Download this run's immutable build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: release-assets
+          merge-multiple: true
+      - name: Validate assets without executing them
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Invalid tag.' }
+          $zip = 'winkick-' + $env:RELEASE_TAG + '-windows-x64.zip'
+          $expected = @('winkick.exe','tasks.ini','build-info.json',$zip,'SHA256SUMS')
+          $actual = @(Get-ChildItem release-assets -File | ForEach-Object Name)
+          if (@(Compare-Object $expected $actual).Count) { throw 'Unexpected or missing release assets.' }
+          $seen = @{}
+          foreach ($line in [IO.File]::ReadAllLines((Join-Path $PWD 'release-assets\SHA256SUMS'))) {
+            if ($line -notmatch '^([a-f0-9]{64})  ([A-Za-z0-9_.+-]+)$') { throw 'Invalid checksum entry.' }
+            $hash = $Matches[1]; $name = $Matches[2]
+            if ($name -notin $expected -or $name -eq 'SHA256SUMS' -or $seen.ContainsKey($name)) { throw 'Unexpected checksum target.' }
+            $seen[$name] = $true
+            if ((Get-FileHash (Join-Path 'release-assets' $name)).Hash.ToLowerInvariant() -ne $hash) { throw "Checksum mismatch: $name" }
+          }
+          if ($seen.Count -ne 4) { throw 'Incomplete checksums.' }
+          $info = Get-Content release-assets/build-info.json -Raw | ConvertFrom-Json
+          if ($info.Tag -ne $env:RELEASE_TAG -or ('v'+$info.Version) -ne $env:RELEASE_TAG -or $info.SourceCommit -ne $env:GITHUB_SHA -or $info.DirtySource) { throw 'Build metadata does not match the tagged source.' }
+          if ($info.ExecutableSHA256 -ne (Get-FileHash release-assets/winkick.exe).Hash.ToLowerInvariant() -or $info.TaskCatalogSHA256 -ne (Get-FileHash release-assets/tasks.ini).Hash.ToLowerInvariant()) { throw 'Metadata digest mismatch.' }
+      - name: Attest exact release bytes with GitHub OIDC
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release-assets/*
+      - name: Create draft, attach verified assets, then publish
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Copy-Item -LiteralPath $env:BUNDLE_PATH -Destination release-assets/provenance.sigstore.json
+          # Creation below fails if a release already exists; never use --clobber.
+          $notes = @"
+          Built from tagged source by GitHub Actions, with binary verification and provenance attestations.
+          Verify SHA256SUMS and the GitHub attestation before running winkick.exe.
+          All setup tasks are opt-in. Review commands before granting elevation.
+          This EXE is not Authenticode-signed; provenance is not a malware-safety guarantee.
+          "@
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes)
+          $extra = @()
+          if ($env:RELEASE_TAG.Contains('-')) { $extra = @('--prerelease') }
+          & gh release create $env:RELEASE_TAG --repo $env:GH_REPO --verify-tag --draft --title ('WinKick '+$env:RELEASE_TAG) --notes-file release-notes.md @extra
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
+          $files = @(Get-ChildItem release-assets -File | ForEach-Object FullName)
+          & gh release upload $env:RELEASE_TAG @files --repo $env:GH_REPO
+          if ($LASTEXITCODE -ne 0) { throw 'Upload failed; draft deliberately left unpublished.' }
+          & gh release edit $env:RELEASE_TAG --repo $env:GH_REPO --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing failed.' }
