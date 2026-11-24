@@ -12,8 +12,8 @@ enum class ItemRunState {
     Skipped,   // guard-skipped / not selected (final state after skipped run attempt)
     DryRun,    // simulated
     Running,   // in flight
-    Ok,        // executed, exit code 0
-    Failed     // executed, non-zero exit code
+    Ok,        // executed, exit code accepted by the task
+    Failed     // execution error or unaccepted exit code
 };
 
 struct TaskArg {
@@ -31,6 +31,7 @@ struct TaskItem {
     std::string groupName;     // from tags "group:<name>" (lowercased), empty if none
     std::vector<std::string> tags;   // lowercased, group:* excluded
     std::vector<TaskArg> args;      // in file appearance order
+    std::vector<unsigned long> successCodes{0};  // accepted Windows process exit codes
     bool checked = false;
     bool defaultChecked = false;     // post-first-wins initial state
     int index = 0;                   // 0..N-1 source order

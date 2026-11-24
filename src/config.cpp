@@ -5,6 +5,7 @@
 #include <set>
 #include <sstream>
 #include <algorithm>
+#include <charconv>
 
 HINSTANCE g_hInstance = nullptr;
 void SetAppInstance(HINSTANCE h) { g_hInstance = h; }
@@ -148,6 +149,21 @@ Config ParseIniBlocks(const std::string& content, const std::string& sourceLabel
             cur.desc = value;
         } else if (keyLower == "cmd") {
             cur.cmd = value;
+        } else if (keyLower == "successcode") {
+            std::vector<unsigned long> codes;
+            for (const std::string& tokRaw : SplitChar(value, ',')) {
+                std::string tok = env::Trim(tokRaw);
+                const char* end = tok.data() + tok.size();
+                unsigned long code = 0;
+                auto result = std::from_chars(tok.data(), end, code);
+                if (result.ec != std::errc{} || result.ptr != end) {
+                    codes.clear();
+                    break;
+                }
+                codes.push_back(code);
+            }
+            // Ignore a malformed list as a whole, like other malformed INI lines.
+            if (!codes.empty()) cur.successCodes = std::move(codes);
         } else if (env::StartsWithNoCase(keyLower, "arg.")) {
             std::string argName = env::Trim(key.substr(4));
             if (argName.empty()) continue;
@@ -208,6 +224,14 @@ std::string SerializeIniBlocks(const std::vector<TaskItem>& items) {
             out << "\n";
         }
         if (!item.desc.empty()) out << "desc  = " << StripCrLf(item.desc) << "\n";
+        if (item.successCodes.size() != 1 || item.successCodes.front() != 0) {
+            out << "successCode = ";
+            for (size_t i = 0; i < item.successCodes.size(); ++i) {
+                if (i) out << ", ";
+                out << item.successCodes[i];
+            }
+            out << "\n";
+        }
         for (const auto& arg : item.args) {
             out << "arg." << arg.name << " = " << (arg.type == "num" ? "num:" : "txt:") << StripCrLf(arg.currentValue) << "\n";
         }

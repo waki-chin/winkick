@@ -275,6 +275,62 @@ int main() {
         check("s10: child stdin reads EOF instead of hanging", stats.succeeded == 2 && Contains(log, "stdin-eof"));
     }
 
+    // ---------- Scenario 11: task-specific successful exit codes ----------
+    {
+        Config cfg = ParseIniBlocks(
+            "[T|Installer]\nparam=check:1\ntags=reboot,restart-explorer\n"
+            "SuCcEsScOdE = 0, \t3010 \ncmd=exit /b 3010\n"
+            "[T|Copy]\nparam=check:1\nsuccessCode=0,1,2,3,4,5,6,7\ncmd=exit /b 7\n"
+            "[T|Copy failure]\nparam=check:1\nsuccessCode=0,1,2,3,4,5,6,7\ncmd=exit /b 8\n"
+            "[T|Default]\nparam=check:1\ncmd=exit /b 7\n"
+            "[T|Zero excluded]\nparam=check:1\nsuccessCode=3010\ncmd=exit /b 0\n"
+            "[T|Real 127]\nparam=check:1\nsuccessCode=127\ncmd=exit /b 127\n"
+            "[T|Empty command]\nparam=check:1\nsuccessCode=127\ncmd=\n"
+            "[T|Malformed list]\nsuccessCode=7, invalid\n"
+            "[T|Overflow]\nsuccessCode=4294967296\n"
+            "[T|Empty list]\nsuccessCode=\n"
+            // Exceed CreateProcessW's 32,767-character limit with a harmless command.
+            "[T|Launch failure]\nparam=check:1\nsuccessCode=127\ncmd=rem " + string(33000, 'x') + "\n", "Test");
+        check("s11: case-insensitive key, trimmed list, not a placeholder",
+              cfg.items[0].successCodes == vector<unsigned long>{0, 3010} && cfg.items[0].args.empty());
+        check("s11: malformed lists keep the default",
+              cfg.items[7].successCodes == vector<unsigned long>{0} &&
+              cfg.items[8].successCodes == vector<unsigned long>{0} &&
+              cfg.items[9].successCodes == vector<unsigned long>{0});
+
+        // Export and UAC hand-off use the same serializer; execute the reloaded catalog.
+        Config reloaded = ParseIniBlocks(SerializeIniBlocks(cfg.items), "Roundtrip");
+        check("s11: single and multiple success codes survive export",
+              reloaded.items[0].successCodes == cfg.items[0].successCodes &&
+              reloaded.items[4].successCodes == cfg.items[4].successCodes);
+        runner::Options opts;
+        opts.silent = true;
+        opts.noReboot = true;
+        opts.noExplorerRestart = true;
+        string log;
+        bool reportedOk = false;
+        runner::Stats stats = runner::RunAll(reloaded.items, opts,
+            [&](const string& line) { log += line + '\n'; },
+            [&](int index, ItemRunState state, unsigned long, unsigned long code) {
+                if (index == 0 && state == ItemRunState::Ok && code == 3010) reportedOk = true;
+            });
+        check("s11: accepted nonzero exit is logged and reported as OK",
+              Contains(log, "RES: OK (exit=3010,") && reportedOk &&
+              reloaded.items[0].state == ItemRunState::Ok && reloaded.items[0].lastExitCode == 3010);
+        check("s11: Robocopy-style success and failure are distinguished",
+              reloaded.items[1].state == ItemRunState::Ok && reloaded.items[2].state == ItemRunState::Failed);
+        check("s11: codes are per-task and an explicit list replaces zero",
+              reloaded.items[3].state == ItemRunState::Failed && reloaded.items[4].state == ItemRunState::Failed);
+        check("s11: synthetic empty-command failure cannot be accepted as exit 127",
+              reloaded.items[5].state == ItemRunState::Ok && reloaded.items[6].state == ItemRunState::Failed);
+        check("s11: process launch failure cannot be accepted as exit 127",
+              reloaded.items[10].state == ItemRunState::Failed && reloaded.items[10].lastExitCode == 127 &&
+              Contains(log, "Failed to create process"));
+        check("s11: success codes drive summary and lifecycle flags",
+              stats.succeeded == 3 && stats.failed == 5 && stats.failedItems.size() == 5 &&
+              stats.anyReboot && stats.anyRestartExplorer);
+    }
+
     cout << (failures == 0 ? "\nALL HARNESS SCENARIOS PASSED" : "\nHARNESS FAILURES: ") << (failures == 0 ? "" : to_string(failures)) << endl;
     return failures == 0 ? 0 : 1;
 }

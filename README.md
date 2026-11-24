@@ -72,8 +72,10 @@ use `Start-Process -Wait -PassThru` for exit codes or a
 
 Exit codes: **0** completed without task failures, **1** task/privilege/reboot
 failure, **2** command-line/configuration/output error. Guard-skipped items are
-not task failures. General shell success remains `exit == 0`; selected installer
-tasks explicitly normalize completed-install code 3010 and show a restart notice.
+not task failures. A task succeeds on exit code `0` by default; each task can
+override this with [`successCode`](docs/tasks.md#successful-exit-codes).
+Selected built-in installer tasks still normalize completed-install code 3010
+and show a restart notice.
 
 ## Catalog
 
@@ -95,10 +97,13 @@ Each release also includes its own `tasks.ini`.
 
 ## Build from source
 
-Install Visual Studio 2022 or later **C++ Build Tools**, the x64 compiler and a
-Windows SDK. Build scripts discover installations through `vswhere`; an explicit
-`VCVARS` path can override detection. No WinGet/Scoop/Chocolatey bootstrap is run
-by the build.
+Use Visual Studio 2022 or later with **Desktop development with C++**, including
+the MSVC x64/x86 build tools and a Windows SDK. If Visual Studio is already
+installed, add the workload with **Visual Studio Installer → Modify**. The
+standalone **Build Tools for Visual Studio** with the same workload also work.
+Build scripts discover installations through `vswhere`; set `VCVARS` to the full
+path to `vcvars64.bat` to override detection. The build does not install any
+prerequisites.
 
 ```powershell
 .\build.bat
@@ -114,6 +119,15 @@ objects, analysis outputs, and the EXE belong in `build/`; test evidence is in
 changes unless loading that file explicitly with `--config`.
 
 The automated tests don't install apps, reboot Windows, or restart Explorer.
+
+### Release checklist
+
+1. Set `VERSION` and update `CHANGELOG.md`. Build and run `scripts/test-build.ps1`.
+2. When ready to publish, merge the tested commit into `main` and tag that
+   exact commit with `v` followed by `VERSION`.
+3. Pushing that tag starts the release workflow. Review the build and approve
+   the `release` environment in GitHub Actions to attest and publish the official
+   assets. Don't upload local builds.
 
 ## Repository layout
 

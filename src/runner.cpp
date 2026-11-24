@@ -54,6 +54,7 @@ struct FileWriter {
 
 // Spawn cmd.exe /c "<cmd>" with merged stdout+stderr into one pipe (avoids pipe-fill deadlock).
 // If visible == true, launch without CREATE_NO_WINDOW and without redirection (GUI items).
+// Return true only when an actual exit code was obtained, regardless of its value.
 bool RunChild(const std::string& cmd, std::string& captured, DWORD& exitCode, unsigned long& elapsedMs,
               bool visible, const LogSink& outputSink) {
     auto start = std::chrono::steady_clock::now();
@@ -68,6 +69,21 @@ bool RunChild(const std::string& cmd, std::string& captured, DWORD& exitCode, un
     // /s makes the outer quoting deterministic, including quoted executable paths.
     std::wstring cmdline = L"\"" + cmdExe + L"\" /d /s /c \"" + wideCmd + L"\"";
 
+    auto finishProcess = [&](const PROCESS_INFORMATION& pi, std::string& error) {
+        if (WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
+            error = "Failed to wait for process (error " + std::to_string(GetLastError()) + ").";
+        } else {
+            DWORD code = 0;
+            if (GetExitCodeProcess(pi.hProcess, &code)) exitCode = code;
+            else error = "Failed to read process exit code (error " + std::to_string(GetLastError()) + ").";
+        }
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        auto end = std::chrono::steady_clock::now();
+        elapsedMs = (unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        return error.empty();
+    };
+
     if (visible) {
         STARTUPINFOW si{}; si.cb = sizeof(si);
         si.dwFlags = STARTF_USESHOWWINDOW;
@@ -75,20 +91,14 @@ bool RunChild(const std::string& cmd, std::string& captured, DWORD& exitCode, un
         PROCESS_INFORMATION pi{};
         if (!CreateProcessW(cmdExe.c_str(), cmdline.data(), nullptr, nullptr, FALSE,
                             0, nullptr, nullptr, &si, &pi)) {
-            exitCode = 127;
             captured = "Failed to create process (error " + std::to_string(GetLastError()) + ").";
             auto end = std::chrono::steady_clock::now();
             elapsedMs = (unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
             return false;
         }
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        GetExitCodeProcess(pi.hProcess, &exitCode);
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-        captured = "(not captured - launched visibly)";
-        auto end = std::chrono::steady_clock::now();
-        elapsedMs = (unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        return exitCode == 0;
+        bool exited = finishProcess(pi, captured);
+        if (exited) captured = "(not captured - launched visibly)";
+        return exited;
     }
 
     SECURITY_ATTRIBUTES sa{};
@@ -195,14 +205,10 @@ bool RunChild(const std::string& cmd, std::string& captured, DWORD& exitCode, un
     if (!streamLine.empty()) outputSink(EnsureUtf8(streamLine));
     CloseHandle(hRead);
 
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-
-    auto end = std::chrono::steady_clock::now();
-    elapsedMs = (unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    return exitCode == 0;
+    std::string error;
+    bool exited = finishProcess(pi, error);
+    if (!exited) outputSink(error);
+    return exited;
 }
 
 } // namespace
@@ -536,7 +542,9 @@ Stats RunAll(std::vector<TaskItem>& items, const Options& opts,
             Log((outputStreamed ? "       " : "  OUT: ") + line);
             outputStreamed = true;
         };
-        RunChild(substituted, captured, exitCode, elapsedMs, visible, outputSink);
+        bool exited = RunChild(substituted, captured, exitCode, elapsedMs, visible, outputSink);
+        bool succeeded = exited &&
+            std::find(item.successCodes.begin(), item.successCodes.end(), exitCode) != item.successCodes.end();
 
         // Visible launches and process-creation errors do not use the pipe sink.
         if (!outputStreamed) {
@@ -552,14 +560,14 @@ Stats RunAll(std::vector<TaskItem>& items, const Options& opts,
 
         char resBuf[128];
         snprintf(resBuf, sizeof(resBuf), "  RES: %s (exit=%lu, %lu ms)",
-                 exitCode == 0 ? "OK" : "ERR", (unsigned long)exitCode, elapsedMs);
+                 succeeded ? "OK" : "ERR", (unsigned long)exitCode, elapsedMs);
         Log(resBuf);
         Log("");
 
         item.lastExitCode = (unsigned long)exitCode;
         item.lastElapsedMs = elapsedMs;
-        item.state = (exitCode == 0) ? ItemRunState::Ok : ItemRunState::Failed;
-        if (exitCode == 0) {
+        item.state = succeeded ? ItemRunState::Ok : ItemRunState::Failed;
+        if (succeeded) {
             stats.succeeded++;
             if (ItemHasTag(item, "restart-explorer")) stats.anyRestartExplorer = true;
             if (ItemHasTag(item, "reboot")) stats.anyReboot = true;

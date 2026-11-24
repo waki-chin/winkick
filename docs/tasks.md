@@ -19,6 +19,31 @@ Commands are single-line shell templates; substitution does not escape arguments
 Only full-line `#`/`;` comments are comments. Values can contain meaningful
 whitespace. Export writes current selections and edited argument values.
 
+### Successful exit codes
+
+By default, only exit code `0` counts as success. Set the optional
+`successCode` key on a task to replace that default with one code or a
+comma-separated list. Include `0` if it should still count as success.
+
+```ini
+[Examples | Installer result demo]
+param = check:0
+successCode = 0, 3010
+cmd = exit /b 3010
+```
+
+This example exits with `3010` without installing anything. A Windows installer
+can use `3010` for “success, restart required.” For Robocopy, use
+`successCode = 0, 1, 2, 3, 4, 5, 6, 7` to accept its non-failure results.
+
+`successCode` is reserved task metadata, not an editable `arg.*` placeholder.
+The key is case-insensitive and its values are unsigned 32-bit decimal
+integers. Malformed lists are ignored. WinKick checks the exit code returned
+by the task command (so a wrapper must pass it through), logs the actual code,
+and preserves the setting on export. WinKick launch errors and empty commands
+still fail. Accepting a code does not by itself request a reboot.
+WinKick versions before 1.1.0 ignore the key and still expect exit code `0`.
+
 ## Tags
 
 | Tag | Effect |
